@@ -1,229 +1,439 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>My Map Drawer</title>
-<link rel="preconnect" href="https://cdn.jsdelivr.net" />
-<style>
-  :root{
-    --bg:#0b1220; --panel:#0f172a; --ink:#e2e8f0;
-    --muted:#94a3b8; --accent:#1976d2; --line:#1f2937; --stroke:#283749;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial}
-  .app{display:flex;flex-direction:column;min-height:100%}
-  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
-  .title{font-weight:800}
-  .tabs{display:flex;gap:8px}
-  .tab{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
-  .tab.active{outline:2px solid var(--accent)}
-  main{flex:1;display:flex;gap:12px;padding:12px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .left{width:45%;display:flex;flex-direction:column;min-height:480px}
-  .right{flex:1;display:flex;flex-direction:column}
-  .toolbar{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--line)}
-  .btn{padding:8px 10px;border-radius:8px;background:#122033;border:1px solid var(--line);color:var(--ink);cursor:pointer}
-  .btn.primary{background:var(--accent);border-color:#115293}
-  .input, textarea{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:#0b1426;color:#fff}
-  .editor{flex:1;padding:12px}
-  .preview{flex:1;overflow:auto;padding:16px}
-  .note{color:var(--muted);padding:8px 12px;font-size:12px}
-  .row{display:grid;grid-template-columns:1fr 120px 60px;gap:8px;margin-bottom:8px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Map Drawer</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f172a; --ink:#e2e8f0;
+      --muted:#94a3b8; --accent:#1976d2; --stroke:#283749;
+      --btn:#0b1426; --btnText:#fff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--stroke)}
+    .title{font-weight:800;font-size:16px}
+    .tabs{display:flex;gap:8px}
+    .tab{padding:8px 12px;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);cursor:pointer}
+    .tab_active{outline:2px solid var(--accent)}
+    main{display:flex;gap:12px;padding:12px}
+    .left{width:46%;display:flex;flex-direction:column;min-height:480px}
+    .right{flex:1;display:flex;flex-direction:column;min-height:480px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;border-bottom:1px solid var(--stroke);padding-bottom:8px;margin-bottom:8px}
+    .btn{padding:8px 10px;border-radius:8px;background:var(--btn);border:1px solid var(--stroke);color:var(--ink);cursor:pointer}
+    .btn.primary{background:#0b1426;border-color:#0b1426;color:#fff}
+    .btn.ghost{background:transparent}
+    textarea{
+      width:100%;height:100%;min-height:320px;resize:vertical;
+      padding:10px;border-radius:10px;border:1px solid var(--stroke);
+      background:#081120;color:#e2e8f0;font:13px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace
+    }
+    .canvas{
+      flex:1;display:flex;align-items:center;justify-content:center;
+      border:1px dashed var(--stroke);border-radius:10px;background:#06101f;min-height:320px;position:relative;overflow:auto
+    }
+    .note{color:var(--muted);font-size:12px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .grid{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center}
+    input[type="text"], input[type="number"]{
+      width:100%;padding:8px;border-radius:8px;background:#0b1426;border:1px solid var(--stroke);color:#e2e8f0
+    }
+    .pill{padding:4px 8px;border:1px solid var(--stroke);border-radius:999px;background:#0f172a}
+    footer{padding:10px 16px;border-top:1px solid var(--stroke);color:#94a3b8}
+    .hidden{display:none}
+    /* Mermaid container tweak */
+    #renderTarget svg{max-width:100%;height:auto}
+  </style>
 </head>
 <body>
-<div class="app">
   <header>
-    <div class="title">Map Drawer</div>
+    <div class="title">🗺️ Map Drawer — Mermaid + Funnel</div>
     <div class="tabs">
-      <button class="tab active" id="tab-mermaid">Mermaid Map</button>
+      <button class="tab tab_active" id="tab-mermaid">Mermaid editor</button>
       <button class="tab" id="tab-funnel">PLU Funnel</button>
     </div>
-    <a class="btn" href="https://mermaid.js.org/syntax/flowchart.html" target="_blank">Mermaid Help ↗</a>
   </header>
 
-  <main>
-    <!-- LEFT -->
-    <section class="panel left" id="left-mermaid">
-      <div class="toolbar">
-        <button class="btn" id="btn-export-mmd-png">Export PNG</button>
-        <span class="note">Type Mermaid → live preview on the right. Saved automatically.</span>
+  <!-- =========== MERMAID EDITOR =========== -->
+  <section id="panel-mermaid">
+    <main>
+      <div class="left">
+        <div class="toolbar">
+          <div class="row">
+            <button class="btn" id="tpl-knit">Template: Knit PD</button>
+            <button class="btn" id="tpl-outsourced">Template: Outsourced PD</button>
+          </div>
+          <div class="row">
+            <button class="btn" id="btn-remove-arrows" title="Change --> to --- (no arrowheads)">No-arrow lines</button>
+            <button class="btn" id="btn-restore-arrows" title="Change --- back to -->">Restore arrows</button>
+            <button class="btn primary" id="btn-render">Render ▶</button>
+          </div>
+        </div>
+        <textarea id="src" spellcheck="false"></textarea>
+        <div class="note">Tip: edit the text → Render. Use <span class="pill">subgraph</span> for stages and <span class="pill">direction TB</span> inside each stage to stack steps vertically.</div>
       </div>
-      <div class="editor">
-        <textarea id="mmd-input" rows="18" class="input"></textarea>
+
+      <div class="right">
+        <div class="toolbar">
+          <div class="row">
+            <button class="btn" id="btn-copy-svg">Copy SVG</button>
+            <button class="btn" id="btn-download-svg">Download SVG</button>
+            <button class="btn" id="btn-download-png">Download PNG</button>
+          </div>
+          <div class="row note">Rendered preview</div>
+        </div>
+        <div id="renderTarget" class="canvas"><div class="note">Click “Render” to see your diagram</div></div>
       </div>
-    </section>
+    </main>
+  </section>
 
-    <section class="panel left" id="left-funnel" style="display:none">
-      <div class="toolbar">
-        <button class="btn" id="btn-stage-add">+ Add Stage</button>
-        <span class="note">Edit labels & counts; export from the right panel.</span>
+  <!-- =========== FUNNEL BUILDER =========== -->
+  <section id="panel-funnel" class="hidden">
+    <main>
+      <div class="left">
+        <div class="toolbar">
+          <div class="row"><strong>Top-down PLU Funnel</strong></div>
+          <div class="row">
+            <button class="btn" id="btn-add-stage">+ Stage</button>
+            <button class="btn" id="btn-reset-funnel">Reset sample</button>
+            <button class="btn primary" id="btn-draw-funnel">Draw ▶</button>
+          </div>
+        </div>
+        <div id="funnelForm"></div>
+        <div class="note">Add 3–6 stages. The canvas will taper segments automatically. Counts print in each band and drop deltas show on the right.</div>
       </div>
-      <div class="editor" id="funnel-editor"></div>
-      <div class="note">Tip: duplicate this page (Repo → “Use this template”) to keep one version per program (Woven / Knit / Outsourced).</div>
-    </section>
-
-    <!-- RIGHT -->
-    <section class="panel right" id="right-mermaid">
-      <div class="toolbar">
-        <button class="btn" id="btn-refresh">Refresh</button>
-        <button class="btn" id="btn-export-mmd-svg">Export SVG</button>
+      <div class="right">
+        <div class="toolbar">
+          <div class="row">
+            <button class="btn" id="btn-funnel-svg">Download SVG</button>
+            <button class="btn" id="btn-funnel-png">Download PNG</button>
+          </div>
+          <div class="row note">Funnel preview</div>
+        </div>
+        <div id="funnelTarget" class="canvas"></div>
       </div>
-      <div class="preview" id="mmd-preview">Waiting for Mermaid…</div>
-    </section>
+    </main>
+  </section>
 
-    <section class="panel right" id="right-funnel" style="display:none">
-      <div class="toolbar">
-        <select class="btn" id="units">
-          <option>PLUs</option>
-          <option>Styles</option>
-          <option>Options</option>
-        </select>
-        <button class="btn" id="btn-export-funnel-png">Export PNG</button>
-        <button class="btn" id="btn-export-funnel-svg">Export SVG</button>
-      </div>
-      <div class="preview" id="funnel-preview"></div>
-    </section>
-  </main>
-</div>
+  <footer>Made for your PD mapping workflows. Mermaid rendering via CDN; no data leaves your browser.</footer>
 
-<!-- Libraries from CDNs -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <!-- Mermaid (ESM) -->
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad:false,
+      theme:'dark',
+      themeVariables:{
+        primaryColor:'#1976d2',
+        edgeLabelBackground:'#0b1426',
+        fontSize:'14px'
+      }
+    });
 
-<script>
-/* ---------------- Mermaid setup ---------------- */
-const defaultMmd = `%% Example: your knit process
+    // ---------- Templates (safe syntax; no advanced tokens) ----------
+    const KNIT = `
 flowchart LR
-  subgraph "First Fit"
-    A["Align concept — Ken • Designer • PD"] --> B["Confirm fabric — GAK/GAW"]
-    B --> C["Sketch drafts — Designer"]; C --- D["Trims dev — Compass"]
-    C --> E["Lab-dip — GAK → PD"]; E --> F["1st fit sample — TCE"]; F --> G["Review & comments — PD • Designer"]
+  subgraph "First Fit Sample"
+    direction TB
+    t1["Align concept — Ken, Designer, PD"]
+    t2["Confirm fabric — PD ↔ GAK"]
+    t3["Sketch drafts — Designer"]
+    t4["Lab-dip A4 — GAK → PD"]
+    t5["Trims development — Compass"]
+    t6["1st fit sample — TCE"]
+    t7["Review & comments — PD, Designer"]
   end
-  G --> H["Mid-season prep"] --> I["Line Review prep"] --> J["Line Review & Orders"] --> K["Handover"]
+  subgraph "Mid-season Prep"
+    direction TB
+    m1["Order fabric for samples — PD → GAK"]
+    m2["Confirm trims — Compass"]
+    m3["Sample ready — TCE"]
+    m4["Review & approve — PD, Designer, TCE"]
+    m5["Testing & risk assessment — PD"]
+    m6["FOB estimate — PD"]
+    m7["Preview to Sales"]
+    m8["Mid-season meeting — all parties"]
+  end
+  subgraph "Line Review Prep"
+    direction TB
+    l1["Apply Mid-season adjustments"]
+    l2["Confirm full color arrangement — Designer"]
+    l3["PPO to GAK & Compass — PD"]
+    l4["LR samples ready & approved — TCE"]
+    l5["Regional preview & pre-buy"]
+  end
+  subgraph "Line Review & Orders"
+    direction TB
+    r1["Line Review (day event) — all"]
+    r2["Regional orders submitted"]
+  end
+  subgraph "Handover"
+    direction TB
+    h1["PD + TCE → GEG: tech pack & order qty"]
+  end
+  t1-->t2-->t3-->t4-->t6-->t7-->m1
+  t3---t5
+  m1-->m3-->m4-->m5-->m6-->m7-->m8-->l1
+  m2---m3
+  l1-->l2-->l3-->l4-->l5-->r1-->r2-->h1
 `;
 
-const $mmdInput = document.getElementById('mmd-input');
-const $mmdPreview = document.getElementById('mmd-preview');
-$mmdInput.value = localStorage.getItem('mmd') || defaultMmd;
+    const OUTSOURCED = `
+flowchart LR
+  subgraph "Fit Testing (Outsourced)"
+    direction TB
+    o1["Ken confirms concept"]
+    o2["Designer sketches"]
+    o3["PD prepares H/L & lab-dip"]
+    o4["Tech pack & proto → external factory (substitute fabric ok)"]
+  end
+  subgraph "Mid-season — CN (in-house fabric + ext. factory)"
+    direction TB
+    cn1["PPO fabric for mid-season — PD → GAK/GAW"]
+    cn2["Send fabric & existing trims → factory"]
+    cn3["Testing & risk assessment — PD"]
+    cn4["加工費 / costing — GEG ↔ factory"]
+    cn5["Sales preview"]
+    cn6["Mid-season meeting (Approved / Revise / Drop)"]
+  end
+  subgraph "Mid-season — FOB (supplier fabric + ext. factory)"
+    direction TB
+    f1["Supplier provides fabric; confirm fabric/trims"]
+    f2["Build sample at factory"]
+    f3["FOB / costing — GEG"]
+    f4["Sales preview"]
+    f5["Mid-season meeting (Approved / Revise / Drop)"]
+  end
+  subgraph "Line Review Prep (both branches)"
+    direction TB
+    l1["Apply mid-season adjustments; confirm full colors"]
+    l2["CN: PPO for LR fabric — PD → GAK/GAW"]
+    l3["FOB: supplier confirms LR fabric"]
+    l4["Trims confirm; LR samples ready"]
+  end
+  subgraph "Line Review & Orders"
+    direction TB
+    r1["Regional preview & pre-buy"]
+    r2["Line Review (day event)"]
+    r3["Regional orders submitted"]
+  end
+  subgraph "Handover"
+    direction TB
+    h1["PD leads handover → GEG: consolidated orders + tech pack"]
+  end
+  o1-->o2-->o3-->o4-->cn1
+  o4-->f1
+  cn1-->cn2-->cn3-->cn4-->cn5-->cn6-->l1
+  f1-->f2-->f3-->f4-->f5-->l1
+  l1-->l2---l4
+  l1-->l3---l4
+  l4-->r1-->r2-->r3-->h1
+`;
 
-mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'loose' });
+    // ---------- UI elements ----------
+    const src = document.getElementById('src');
+    const renderTarget = document.getElementById('renderTarget');
 
-async function renderMermaid() {
-  try {
-    const { svg } = await mermaid.render('mmd-'+Date.now(), $mmdInput.value);
-    $mmdPreview.innerHTML = svg;
-    localStorage.setItem('mmd', $mmdInput.value);
-  } catch (e) {
-    $mmdPreview.innerHTML = '<pre style="color:#ef9a9a">Parse error:\\n' + String(e) + '</pre>';
-  }
-}
-document.getElementById('btn-refresh').onclick = renderMermaid;
-$mmdInput.addEventListener('input', () => {
-  // Debounce a bit
-  clearTimeout(window.__mmd_t);
-  window.__mmd_t = setTimeout(renderMermaid, 300);
-});
-renderMermaid();
+    document.getElementById('tpl-knit').onclick = () => { src.value = KNIT.trim(); };
+    document.getElementById('tpl-outsourced').onclick = () => { src.value = OUTSOURCED.trim(); };
 
-/* Export helpers */
-async function exportPNG(el, name) {
-  const dataUrl = await htmlToImage.toPng(el, { pixelRatio: 2 });
-  saveAs(dataUrl, name + '.png');
-}
-async function exportSVG(el, name) {
-  const dataUrl = await htmlToImage.toSvg(el);
-  const blob = new Blob([dataUrl], { type: 'image/svg+xml;charset=utf-8' });
-  saveAs(blob, name + '.svg');
-}
-document.getElementById('btn-export-mmd-png').onclick = () => exportPNG($mmdPreview, 'mermaid');
-document.getElementById('btn-export-mmd-svg').onclick = () => exportSVG($mmdPreview, 'mermaid');
+    document.getElementById('btn-remove-arrows').onclick = () => {
+      src.value = src.value.replaceAll('-->', '---');
+    };
+    document.getElementById('btn-restore-arrows').onclick = () => {
+      // restore only simple lines (avoid breaking text)
+      src.value = src.value.replaceAll(/\s---\s/g, ' --> ');
+    };
 
-/* ---------------- Funnel builder ---------------- */
-const $funnelEditor = document.getElementById('funnel-editor');
-const $funnelPreview = document.getElementById('funnel-preview');
-const $units = document.getElementById('units');
+    document.getElementById('btn-render').onclick = async () => {
+      await renderMermaid(src.value);
+    };
 
-let funnel = JSON.parse(localStorage.getItem('funnel')||'null') || {
-  stages: [
-    { label:'Direction / Concept', count:120 },
-    { label:'Fit Review', count:108 },
-    { label:'Mid-season', count:96 },
-    { label:'Line Review / Assortment', count:87 },
-  ]
-};
+    async function renderMermaid(code){
+      renderTarget.innerHTML = '<div class="note">Rendering…</div>';
+      try{
+        const { svg } = await mermaid.render('mmd-'+Date.now(), code);
+        renderTarget.innerHTML = svg;
+      }catch(e){
+        renderTarget.innerHTML = '<div style="color:#ff6b6b;white-space:pre-wrap;padding:12px">Mermaid error:\n'+e.message+'</div>';
+      }
+    }
 
-function saveFunnel(){ localStorage.setItem('funnel', JSON.stringify(funnel)); }
+    // ---------- Export helpers ----------
+    function download(filename, dataUrl){
+      const a = document.createElement('a');
+      a.href = dataUrl; a.download = filename; a.click();
+    }
 
-function renderFunnelEditor(){
-  $funnelEditor.innerHTML = '';
-  funnel.stages.forEach((s, i) => {
-    const row = document.createElement('div'); row.className='row';
-    const label = document.createElement('input'); label.className='input'; label.value = s.label;
-    label.oninput = ()=>{ s.label = label.value; saveFunnel(); renderFunnel(); };
-    const count = document.createElement('input'); count.className='input'; count.type='number'; count.value=s.count;
-    count.oninput = ()=>{ s.count = Number(count.value || 0); saveFunnel(); renderFunnel(); };
-    const del = document.createElement('button'); del.className='btn'; del.textContent='Delete';
-    del.onclick = ()=>{ funnel.stages.splice(i,1); saveFunnel(); renderFunnelEditor(); renderFunnel(); };
-    row.append(label, count, del);
-    $funnelEditor.appendChild(row);
-  });
-}
-function renderFunnel(){
-  const stages = funnel.stages;
-  const top = 560, bottom = 160, h = 90, gap = 6, n=stages.length;
-  const widths = stages.map((_,i)=> top - (top-bottom)*(i/(n-1||1)));
-  const totalH = n*h + (n-1)*gap + 180;
-  const cx = 400, startY=40;
+    function currentSVG(){
+      const svg = renderTarget.querySelector('svg');
+      if(!svg) return null;
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+      return new XMLSerializer().serializeToString(clone);
+    }
 
-  const colors = ['#ffd260','#ffab8a','#a4dbc3','#ff7a7a','#8ea9ff','#c5f36a'];
+    document.getElementById('btn-copy-svg').onclick = async () => {
+      const s = currentSVG();
+      if(!s) return;
+      await navigator.clipboard.writeText(s);
+      alert('SVG copied to clipboard');
+    };
+    document.getElementById('btn-download-svg').onclick = () => {
+      const s = currentSVG(); if(!s) return;
+      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+      download('diagram.svg', url);
+    };
+    document.getElementById('btn-download-png').onclick = () => svgToPng('diagram.png');
 
-  let svg = `<svg width="800" height="${totalH}" viewBox="0 0 800 ${totalH}">
-    <rect width="100%" height="100%" fill="#0f172a"/>`;
+    async function svgToPng(filename){
+      const s = currentSVG(); if(!s) return;
+      const img = new Image();
+      const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = 2; // retina-ish
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#06101f';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        download(filename, canvas.toDataURL('image/png'));
+      };
+      img.src = svgUrl;
+    }
 
-  stages.forEach((s,i)=>{
-    const y = startY + i*(h+gap);
-    const wt = widths[i], wb = widths[i+1] ?? 220;
-    const lt = cx-wt/2, rt=cx+wt/2, lb=cx-wb/2, rb=cx+wb/2;
-    const fill = colors[i%colors.length];
-    svg += `<path d="M ${lt} ${y} L ${rt} ${y} L ${rb} ${y+h} L ${lb} ${y+h} Z"
-              fill="${fill}" stroke="#283749" stroke-width="3"/>`;
-    svg += `<text x="${cx}" y="${y+h/2}" fill="#0b1426" font-size="18" font-weight="700"
-              text-anchor="middle" dominant-baseline="middle">
-              ${s.label} — ${$units.value}: ${s.count}</text>`;
-  });
-  // stem
-  const baseY = startY + n*(h+gap);
-  svg += `<polygon points="${cx-60},${baseY} ${cx+60},${baseY} ${cx},${baseY+46}"
-            fill="#b46a73" stroke="#283749" stroke-width="3"/>`;
-  svg += `<rect x="${cx-30}" y="${baseY+46}" width="60" height="120"
-            fill="#7864c6" stroke="#283749" stroke-width="3"/>`;
-  svg += `</svg>`;
-  $funnelPreview.innerHTML = svg;
-}
-renderFunnelEditor(); renderFunnel();
-document.getElementById('btn-stage-add').onclick = ()=>{
-  funnel.stages.push({label:'New Stage', count:0}); saveFunnel(); renderFunnelEditor(); renderFunnel();
-};
-$units.onchange = renderFunnel;
-document.getElementById('btn-export-funnel-png').onclick = ()=> exportPNG($funnelPreview, 'funnel');
-document.getElementById('btn-export-funnel-svg').onclick = ()=> exportSVG($funnelPreview, 'funnel');
+    // ---------- Tabs ----------
+    const tabMermaid = document.getElementById('tab-mermaid');
+    const tabFunnel = document.getElementById('tab-funnel');
+    const panelMermaid = document.getElementById('panel-mermaid');
+    const panelFunnel = document.getElementById('panel-funnel');
+    function selectTab(which){
+      if(which==='m'){
+        tabMermaid.classList.add('tab_active'); tabFunnel.classList.remove('tab_active');
+        panelMermaid.classList.remove('hidden'); panelFunnel.classList.add('hidden');
+      }else{
+        tabFunnel.classList.add('tab_active'); tabMermaid.classList.remove('tab_active');
+        panelFunnel.classList.remove('hidden'); panelMermaid.classList.add('hidden');
+      }
+    }
+    tabMermaid.onclick = ()=>selectTab('m');
+    tabFunnel.onclick = ()=>selectTab('f');
 
-/* ---------------- Tab switching ---------------- */
-const tM = document.getElementById('tab-mermaid');
-const tF = document.getElementById('tab-funnel');
-function show(which){
-  const isM = which==='m';
-  document.getElementById('left-mermaid').style.display = isM?'':'none';
-  document.getElementById('right-mermaid').style.display= isM?'':'none';
-  document.getElementById('left-funnel').style.display = isM?'none':'';
-  document.getElementById('right-funnel').style.display= isM?'none':'';
-  tM.classList.toggle('active', isM); tF.classList.toggle('active', !isM);
-}
-tM.onclick = ()=>show('m');
-tF.onclick = ()=>show('f');
-</script>
+    // ---------- Funnel builder ----------
+    const formHost = document.getElementById('funnelForm');
+    const funnelTarget = document.getElementById('funnelTarget');
+
+    function sampleStages(){
+      return [
+        {label:'Direction / Concept', count:200},
+        {label:'Fit Review', count:180},
+        {label:'Mid-season', count:100},
+        {label:'Line Review / Assortment', count:80},
+      ];
+    }
+
+    let stages = sampleStages();
+    function renderForm(){
+      formHost.innerHTML = '';
+      stages.forEach((s, i)=>{
+        const row = document.createElement('div');
+        row.className = 'grid';
+        row.innerHTML = `
+          <input type="text" value="${s.label}" data-i="${i}" data-k="label"/>
+          <input type="number" value="${s.count}" data-i="${i}" data-k="count"/>
+        `;
+        formHost.appendChild(row);
+      });
+    }
+    renderForm();
+
+    formHost.addEventListener('input', e=>{
+      const i = +e.target.dataset.i;
+      const k = e.target.dataset.k;
+      if(k==='label') stages[i].label = e.target.value;
+      else stages[i].count = +e.target.value;
+    });
+
+    document.getElementById('btn-add-stage').onclick = ()=>{
+      stages.push({label:'New Stage', count:0}); renderForm();
+    };
+    document.getElementById('btn-reset-funnel').onclick = ()=>{
+      stages = sampleStages(); renderForm(); drawFunnel();
+    };
+    document.getElementById('btn-draw-funnel').onclick = drawFunnel;
+    document.getElementById('btn-funnel-svg').onclick = ()=> download('funnel.svg', funnelTarget.querySelector('svg')?.outerHTML ? 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(funnelTarget.querySelector('svg').outerHTML):'');
+    document.getElementById('btn-funnel-png').onclick = ()=> funnelSvgToPng();
+
+    function drawFunnel(){
+      // layout params
+      const W = 800, H = 520, pad = 24, bandGap = 8;
+      const n = stages.length;
+      const maxW = W - pad*2;
+      const minW = Math.max(80, Math.round(maxW*0.18));
+      const topW = maxW;
+      const bottomW = Math.max(minW, Math.round(maxW*0.22));
+      const bandH = (H - pad*2 - bandGap*(n-1)) / n;
+
+      // Build SVG
+      let y = pad;
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+        <style>
+          .seg{fill:#13315c;stroke:#2b3b55;stroke-width:1}
+          .t{font:600 14px/1.2 ui-sans-serif,system-ui,Segoe UI,Roboto; fill:#e7eefc}
+          .note{font:12px ui-sans-serif; fill:#9fb3c8}
+          .drop{font:12px ui-sans-serif; fill:#f7caca}
+        </style>
+        <rect width="100%" height="100%" fill="#06101f"/>
+        <text x="${pad}" y="${H-pad/2}" class="note">PLU can change between stages; numbers are net at milestones.</text>
+      `;
+      for(let i=0;i<n;i++){
+        const t = i/(n-1||1);
+        const wTop = topW - (topW-bottomW)*t;
+        const wBot = topW - (topW-bottomW)*( (i+1)/(n-1||1) );
+        const xTop = (W - wTop)/2;
+        const xBot = (W - wBot)/2;
+        const path = `
+          M ${xTop} ${y}
+          L ${xTop+wTop} ${y}
+          L ${xBot+wBot} ${y+bandH}
+          L ${xBot} ${y+bandH} Z
+        `;
+        svg += `<path d="${path}" class="seg"/>`;
+        const label = `${stages[i].label} — PLU ${stages[i].count}`;
+        svg += `<text class="t" x="${W/2}" y="${y+bandH/2+4}" text-anchor="middle">${label}</text>`;
+
+        // drop label between i and i+1
+        if(i<n-1){
+          const drop = stages[i].count - stages[i+1].count;
+          const sign = drop>0 ? '-' : '+';
+          const delta = Math.abs(drop);
+          svg += `<text class="drop" x="${xTop+wTop+10}" y="${y+bandH-4}">Δ ${sign}${delta}</text>`;
+        }
+        y += bandH + bandGap;
+      }
+      svg += `</svg>`;
+      funnelTarget.innerHTML = svg;
+    }
+    function funnelSvgToPng(){
+      const svg = funnelTarget.querySelector('svg'); if(!svg) return;
+      const xml = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+      img.onload = ()=>{
+        const c = document.createElement('canvas');
+        c.width = img.width*2; c.height = img.height*2;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img,0,0,c.width,c.height);
+        download('funnel.png', c.toDataURL('image/png'));
+      };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+    }
+
+    // prime editor with Knit template
+    src.value = KNIT.trim();
+  </script>
 </body>
 </html>
