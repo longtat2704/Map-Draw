@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>My Map Drawer</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<style>
+  :root{
+    --bg:#0b1220; --panel:#0f172a; --ink:#e2e8f0;
+    --muted:#94a3b8; --accent:#1976d2; --line:#1f2937; --stroke:#283749;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial}
+  .app{display:flex;flex-direction:column;min-height:100%}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .title{font-weight:800}
+  .tabs{display:flex;gap:8px}
+  .tab{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
+  .tab.active{outline:2px solid var(--accent)}
+  main{flex:1;display:flex;gap:12px;padding:12px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .left{width:45%;display:flex;flex-direction:column;min-height:480px}
+  .right{flex:1;display:flex;flex-direction:column}
+  .toolbar{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--line)}
+  .btn{padding:8px 10px;border-radius:8px;background:#122033;border:1px solid var(--line);color:var(--ink);cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:#115293}
+  .input, textarea{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:#0b1426;color:#fff}
+  .editor{flex:1;padding:12px}
+  .preview{flex:1;overflow:auto;padding:16px}
+  .note{color:var(--muted);padding:8px 12px;font-size:12px}
+  .row{display:grid;grid-template-columns:1fr 120px 60px;gap:8px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title">Map Drawer</div>
+    <div class="tabs">
+      <button class="tab active" id="tab-mermaid">Mermaid Map</button>
+      <button class="tab" id="tab-funnel">PLU Funnel</button>
+    </div>
+    <a class="btn" href="https://mermaid.js.org/syntax/flowchart.html" target="_blank">Mermaid Help ↗</a>
+  </header>
+
+  <main>
+    <!-- LEFT -->
+    <section class="panel left" id="left-mermaid">
+      <div class="toolbar">
+        <button class="btn" id="btn-export-mmd-png">Export PNG</button>
+        <span class="note">Type Mermaid → live preview on the right. Saved automatically.</span>
+      </div>
+      <div class="editor">
+        <textarea id="mmd-input" rows="18" class="input"></textarea>
+      </div>
+    </section>
+
+    <section class="panel left" id="left-funnel" style="display:none">
+      <div class="toolbar">
+        <button class="btn" id="btn-stage-add">+ Add Stage</button>
+        <span class="note">Edit labels & counts; export from the right panel.</span>
+      </div>
+      <div class="editor" id="funnel-editor"></div>
+      <div class="note">Tip: duplicate this page (Repo → “Use this template”) to keep one version per program (Woven / Knit / Outsourced).</div>
+    </section>
+
+    <!-- RIGHT -->
+    <section class="panel right" id="right-mermaid">
+      <div class="toolbar">
+        <button class="btn" id="btn-refresh">Refresh</button>
+        <button class="btn" id="btn-export-mmd-svg">Export SVG</button>
+      </div>
+      <div class="preview" id="mmd-preview">Waiting for Mermaid…</div>
+    </section>
+
+    <section class="panel right" id="right-funnel" style="display:none">
+      <div class="toolbar">
+        <select class="btn" id="units">
+          <option>PLUs</option>
+          <option>Styles</option>
+          <option>Options</option>
+        </select>
+        <button class="btn" id="btn-export-funnel-png">Export PNG</button>
+        <button class="btn" id="btn-export-funnel-svg">Export SVG</button>
+      </div>
+      <div class="preview" id="funnel-preview"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Libraries from CDNs -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+<script>
+/* ---------------- Mermaid setup ---------------- */
+const defaultMmd = `%% Example: your knit process
+flowchart LR
+  subgraph "First Fit"
+    A["Align concept — Ken • Designer • PD"] --> B["Confirm fabric — GAK/GAW"]
+    B --> C["Sketch drafts — Designer"]; C --- D["Trims dev — Compass"]
+    C --> E["Lab-dip — GAK → PD"]; E --> F["1st fit sample — TCE"]; F --> G["Review & comments — PD • Designer"]
+  end
+  G --> H["Mid-season prep"] --> I["Line Review prep"] --> J["Line Review & Orders"] --> K["Handover"]
+`;
+
+const $mmdInput = document.getElementById('mmd-input');
+const $mmdPreview = document.getElementById('mmd-preview');
+$mmdInput.value = localStorage.getItem('mmd') || defaultMmd;
+
+mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'loose' });
+
+async function renderMermaid() {
+  try {
+    const { svg } = await mermaid.render('mmd-'+Date.now(), $mmdInput.value);
+    $mmdPreview.innerHTML = svg;
+    localStorage.setItem('mmd', $mmdInput.value);
+  } catch (e) {
+    $mmdPreview.innerHTML = '<pre style="color:#ef9a9a">Parse error:\\n' + String(e) + '</pre>';
+  }
+}
+document.getElementById('btn-refresh').onclick = renderMermaid;
+$mmdInput.addEventListener('input', () => {
+  // Debounce a bit
+  clearTimeout(window.__mmd_t);
+  window.__mmd_t = setTimeout(renderMermaid, 300);
+});
+renderMermaid();
+
+/* Export helpers */
+async function exportPNG(el, name) {
+  const dataUrl = await htmlToImage.toPng(el, { pixelRatio: 2 });
+  saveAs(dataUrl, name + '.png');
+}
+async function exportSVG(el, name) {
+  const dataUrl = await htmlToImage.toSvg(el);
+  const blob = new Blob([dataUrl], { type: 'image/svg+xml;charset=utf-8' });
+  saveAs(blob, name + '.svg');
+}
+document.getElementById('btn-export-mmd-png').onclick = () => exportPNG($mmdPreview, 'mermaid');
+document.getElementById('btn-export-mmd-svg').onclick = () => exportSVG($mmdPreview, 'mermaid');
+
+/* ---------------- Funnel builder ---------------- */
+const $funnelEditor = document.getElementById('funnel-editor');
+const $funnelPreview = document.getElementById('funnel-preview');
+const $units = document.getElementById('units');
+
+let funnel = JSON.parse(localStorage.getItem('funnel')||'null') || {
+  stages: [
+    { label:'Direction / Concept', count:120 },
+    { label:'Fit Review', count:108 },
+    { label:'Mid-season', count:96 },
+    { label:'Line Review / Assortment', count:87 },
+  ]
+};
+
+function saveFunnel(){ localStorage.setItem('funnel', JSON.stringify(funnel)); }
+
+function renderFunnelEditor(){
+  $funnelEditor.innerHTML = '';
+  funnel.stages.forEach((s, i) => {
+    const row = document.createElement('div'); row.className='row';
+    const label = document.createElement('input'); label.className='input'; label.value = s.label;
+    label.oninput = ()=>{ s.label = label.value; saveFunnel(); renderFunnel(); };
+    const count = document.createElement('input'); count.className='input'; count.type='number'; count.value=s.count;
+    count.oninput = ()=>{ s.count = Number(count.value || 0); saveFunnel(); renderFunnel(); };
+    const del = document.createElement('button'); del.className='btn'; del.textContent='Delete';
+    del.onclick = ()=>{ funnel.stages.splice(i,1); saveFunnel(); renderFunnelEditor(); renderFunnel(); };
+    row.append(label, count, del);
+    $funnelEditor.appendChild(row);
+  });
+}
+function renderFunnel(){
+  const stages = funnel.stages;
+  const top = 560, bottom = 160, h = 90, gap = 6, n=stages.length;
+  const widths = stages.map((_,i)=> top - (top-bottom)*(i/(n-1||1)));
+  const totalH = n*h + (n-1)*gap + 180;
+  const cx = 400, startY=40;
+
+  const colors = ['#ffd260','#ffab8a','#a4dbc3','#ff7a7a','#8ea9ff','#c5f36a'];
+
+  let svg = `<svg width="800" height="${totalH}" viewBox="0 0 800 ${totalH}">
+    <rect width="100%" height="100%" fill="#0f172a"/>`;
+
+  stages.forEach((s,i)=>{
+    const y = startY + i*(h+gap);
+    const wt = widths[i], wb = widths[i+1] ?? 220;
+    const lt = cx-wt/2, rt=cx+wt/2, lb=cx-wb/2, rb=cx+wb/2;
+    const fill = colors[i%colors.length];
+    svg += `<path d="M ${lt} ${y} L ${rt} ${y} L ${rb} ${y+h} L ${lb} ${y+h} Z"
+              fill="${fill}" stroke="#283749" stroke-width="3"/>`;
+    svg += `<text x="${cx}" y="${y+h/2}" fill="#0b1426" font-size="18" font-weight="700"
+              text-anchor="middle" dominant-baseline="middle">
+              ${s.label} — ${$units.value}: ${s.count}</text>`;
+  });
+  // stem
+  const baseY = startY + n*(h+gap);
+  svg += `<polygon points="${cx-60},${baseY} ${cx+60},${baseY} ${cx},${baseY+46}"
+            fill="#b46a73" stroke="#283749" stroke-width="3"/>`;
+  svg += `<rect x="${cx-30}" y="${baseY+46}" width="60" height="120"
+            fill="#7864c6" stroke="#283749" stroke-width="3"/>`;
+  svg += `</svg>`;
+  $funnelPreview.innerHTML = svg;
+}
+renderFunnelEditor(); renderFunnel();
+document.getElementById('btn-stage-add').onclick = ()=>{
+  funnel.stages.push({label:'New Stage', count:0}); saveFunnel(); renderFunnelEditor(); renderFunnel();
+};
+$units.onchange = renderFunnel;
+document.getElementById('btn-export-funnel-png').onclick = ()=> exportPNG($funnelPreview, 'funnel');
+document.getElementById('btn-export-funnel-svg').onclick = ()=> exportSVG($funnelPreview, 'funnel');
+
+/* ---------------- Tab switching ---------------- */
+const tM = document.getElementById('tab-mermaid');
+const tF = document.getElementById('tab-funnel');
+function show(which){
+  const isM = which==='m';
+  document.getElementById('left-mermaid').style.display = isM?'':'none';
+  document.getElementById('right-mermaid').style.display= isM?'':'none';
+  document.getElementById('left-funnel').style.display = isM?'none':'';
+  document.getElementById('right-funnel').style.display= isM?'none':'';
+  tM.classList.toggle('active', isM); tF.classList.toggle('active', !isM);
+}
+tM.onclick = ()=>show('m');
+tF.onclick = ()=>show('f');
+</script>
+</body>
+</html>
